@@ -149,7 +149,8 @@
       let t = 0;
       let h = alturaInicial;
       while (h > 0) {
-        const Qout = Cd * Ao * Math.sqrt(2 * g * h);
+        const qout_input = parseFloat(document.getElementById('qout').value);
+        const Qout = qout_input / 1000 / 60;
         const dV = Qout * dt;
         const dh = dV / area;
         h -= dh;
