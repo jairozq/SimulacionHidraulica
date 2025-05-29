@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Simulación de Tanque de Agua</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -56,6 +56,7 @@
       border: none;
       border-radius: 8px;
       cursor: pointer;
+      margin: 3px;
     }
     .btn:hover {
       background: #005fa3;
@@ -86,6 +87,7 @@
         <input type="number" id="qout" value="5">
       </div>
       <button class="btn" onclick="simular()">Simular</button>
+      <button class="btn" onclick="cambiarGrafico()">Cambiar gráfico</button>
       <div style="margin-top: 20px;">
         <label><strong>Velocidad:</strong></label><br>
         <button class="btn" onclick="cambiarVelocidad(0.5)">×0.5</button>
@@ -105,38 +107,31 @@
         </div>
     </div>
   </div>
+
+  <canvas id="graficoTiempo" style="display: block; margin-top: 30px;"></canvas>
+  <canvas id="graficoDisperso" style="display: none; margin-top: 30px;"></canvas>
   
   <section style="margin-top: 40px; background: #fff; padding: 20px; border-radius: 10px;">
     <h2>📘 Modelo Matemático del Sistema</h2>
     <p><strong>1. Volumen del tanque:</strong></p>
-    <p style="margin-left: 20px;">
-      V = A × h<br>
-      <small>Donde V es el volumen (m³), A el área de la base (m²) y h la altura del tanque (m).</small>
-    </p>
+    <p style="margin-left: 20px;">V = A × h</p>
     <p><strong>2. Caudal neto:</strong></p>
-    <p style="margin-left: 20px;">
-      dV/dt = Q<sub>in</sub> − Q<sub>out</sub>
-    </p>
+    <p style="margin-left: 20px;">dV/dt = Q<sub>in</sub> − Q<sub>out</sub></p>
     <p><strong>3. Tiempo estimado de llenado:</strong></p>
-    <p style="margin-left: 20px;">
-      t = V / (Q<sub>in</sub> − Q<sub>out</sub>)
-    </p>
+    <p style="margin-left: 20px;">t = V / (Q<sub>in</sub> − Q<sub>out</sub>)</p>
     <p><strong>4. Nivel con el tiempo:</strong></p>
-    <p style="margin-left: 20px;">
-      h(t) = [(Q<sub>in</sub> − Q<sub>out</sub>) / A] × t
-    </p>
+    <p style="margin-left: 20px;">h(t) = [(Q<sub>in</sub> − Q<sub>out</sub>) / A] × t</p>
   </section>
-
-  <canvas id="grafico"></canvas>
 
   <script>
     let multiplicador = 1;
-    let inicio = null;
-    let duracionReal = 0;
-    let tiempoReal = 0;
-    let animacionActiva = false;
     let tiempoSimulado = 0;
+    let duracionReal = 0;
     let tiempoAnterior = null;
+    let animacionActiva = false;
+
+    // NUEVO: Array para guardar los puntos simulados
+    const puntosDispersos = [];
 
     function cambiarVelocidad(nuevaVelocidad) {
       multiplicador = nuevaVelocidad;
@@ -165,26 +160,31 @@
 
       const tiempo = volumen / tasa;
       const tiempoEnSegundos = tiempo * 60;
-      tiempoReal = tiempo;
       duracionReal = tiempoEnSegundos * 1000;
 
       document.getElementById('resultado').textContent =
         tiempoEnSegundos >= 60
           ? `Tiempo estimado de llenado: ${(tiempoEnSegundos / 60).toFixed(2)} minutos.`
           : `Tiempo estimado de llenado: ${tiempoEnSegundos.toFixed(0)} segundos.`;
-        
-        water.style.height = '0%';
-        contador.textContent = 'Tiempo simulado: 0 s';
-        animacionActiva = true;
-        inicio = null;
-        animacionActiva = false;
-        cancelAnimationFrame(window.idAnimacion);
-        tiempoSimulado = 0;
-        tiempoAnterior = null;
-        animacionActiva = true;
-        window.idAnimacion = requestAnimationFrame(animar)
-        requestAnimationFrame(animar);
-        
+
+      // NUEVO: Guardar datos para gráfica de dispersión
+      puntosDispersos.push({
+        x: qin,
+        y: parseFloat(tiempo.toFixed(2)),
+        qin,
+        qout,
+        area,
+        altura
+      });
+
+      water.style.height = '0%';
+      contador.textContent = 'Tiempo simulado: 0 s';
+      cancelAnimationFrame(window.idAnimacion);
+      tiempoSimulado = 0;
+      tiempoAnterior = null;
+      animacionActiva = true;
+      window.idAnimacion = requestAnimationFrame(animar);
+
       const tiempoDatos = [];
       const nivelDatos = [];
 
@@ -194,40 +194,19 @@
         nivelDatos.push(Math.min(nivelActual, 100));
       }
 
-      // Calcular puntos clave
-      const t25 = (0.25 * volumen) / tasa;
-      const t50 = (0.50 * volumen) / tasa;
-      const t75 = (0.75 * volumen) / tasa;
-
-      const puntosClave = [
-        { x: t25, y: 25 },
-        { x: t50, y: 50 },
-        { x: t75, y: 75 }
-      ];
-
-      const ctx = document.getElementById('grafico').getContext('2d');
-      if (window.chart) window.chart.destroy();
-      window.chart = new Chart(ctx, {
+      const ctx = document.getElementById('graficoTiempo').getContext('2d');
+      if (window.chartTiempo) window.chartTiempo.destroy();
+      window.chartTiempo = new Chart(ctx, {
         type: 'line',
         data: {
           labels: tiempoDatos,
-          datasets: [
-            {
-              label: 'Nivel de agua (%)',
-              data: nivelDatos,
-              borderColor: '#0077cc',
-              fill: true,
-              tension: 0.2
-            },
-            {
-              type: 'scatter',
-              label: 'Puntos clave',
-              data: puntosClave,
-              backgroundColor: ['orange', 'green', 'red'],
-              pointRadius: 6,
-              showLine: false
-            }
-          ]
+          datasets: [{
+            label: 'Nivel de agua (%)',
+            data: nivelDatos,
+            borderColor: '#0077cc',
+            fill: true,
+            tension: 0.2
+          }]
         },
         options: {
           scales: {
@@ -239,28 +218,76 @@
     }
 
     function animar(timestamp) {
-        const water = document.getElementById('water');
-        const contador = document.getElementById('contador');
-        
-        if (!tiempoAnterior) tiempoAnterior = timestamp;
-        
-        const deltaTiempo = (timestamp - tiempoAnterior) * multiplicador;
-        tiempoSimulado += deltaTiempo;
-        tiempoAnterior = timestamp;
-        
-        const porcentaje = Math.min((tiempoSimulado / duracionReal) * 100, 100);
-        
-        water.style.height = porcentaje + '%';
-        contador.textContent = `Tiempo simulado: ${Math.floor(tiempoSimulado / 1000)} s`;
-        
-        if (porcentaje < 100 && animacionActiva) {
+      const water = document.getElementById('water');
+      const contador = document.getElementById('contador');
+
+      if (!tiempoAnterior) tiempoAnterior = timestamp;
+
+      const deltaTiempo = (timestamp - tiempoAnterior) * multiplicador;
+      tiempoSimulado += deltaTiempo;
+      tiempoAnterior = timestamp;
+
+      const porcentaje = Math.min((tiempoSimulado / duracionReal) * 100, 100);
+      water.style.height = porcentaje + '%';
+      contador.textContent = `Tiempo simulado: ${Math.floor(tiempoSimulado / 1000)} s`;
+
+      if (porcentaje < 100 && animacionActiva) {
         requestAnimationFrame(animar);
-        } else {
+      } else {
         animacionActiva = false;
         contador.textContent = `✅ ¡Llenado completo en ${Math.round(tiempoSimulado / 1000)} s!`;
-        }
+      }
     }
 
+    function cambiarGrafico() {
+      const canvasTiempo = document.getElementById("graficoTiempo");
+      const canvasDisperso = document.getElementById("graficoDisperso");
+
+      if (canvasTiempo.style.display === "none") {
+        canvasTiempo.style.display = "block";
+        canvasDisperso.style.display = "none";
+      } else {
+        canvasTiempo.style.display = "none";
+        canvasDisperso.style.display = "block";
+        generarGraficoDisperso();
+      }
+    }
+
+    function generarGraficoDisperso() {
+      const ctx = document.getElementById('graficoDisperso').getContext('2d');
+      if (window.chartDisperso) window.chartDisperso.destroy();
+      window.chartDisperso = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+          datasets: [{
+            label: 'Tiempo de llenado vs Q<sub>in</sub>',
+            data: puntosDispersos,
+            backgroundColor: '#ff5733',
+            pointRadius: 6
+          }]
+        },
+        options: {
+          plugins: {
+            title: {
+              display: true,
+              text: 'Gráfica de Dispersión: Tiempo de llenado vs Caudal de entrada'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const d = context.raw;
+                  return `qin: ${d.qin} L/min, qout: ${d.qout} L/min, área: ${d.area} m², altura: ${d.altura} m, t: ${d.y} min`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Caudal de entrada (L/min)' } },
+            y: { title: { display: true, text: 'Tiempo de llenado (min)' } }
+          }
+        }
+      });
+    }
   </script>
 </body>
 </html>
