@@ -1,3 +1,4 @@
+<!-- Coloca esto en tu archivo HTML -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -86,7 +87,12 @@
         <label for="qout">Caudal de salida (L/min):</label>
         <input type="number" id="qout" value="5">
       </div>
-      <button class="btn" onclick="simular()">Simular</button>
+      <div class="input-group">
+        <label for="areaOrificio">Área del orificio de salida (cm²):</label>
+        <input type="number" id="areaOrificio" value="1">
+      </div>
+      <button class="btn" onclick="simular()">Simular Llenado</button>
+      <button class="btn" onclick="simularVaciado()">Simular Vaciado</button>
       <button class="btn" onclick="cambiarGrafico()">Cambiar gráfico</button>
       <button class="btn" onclick="optimizarQin()">Optimizar Qin</button>
       <div style="margin-top: 20px;">
@@ -111,18 +117,6 @@
 
   <canvas id="graficoTiempo" style="display: block; margin-top: 30px;"></canvas>
   <canvas id="graficoDisperso" style="display: none; margin-top: 30px;"></canvas>
-  
-  <section style="margin-top: 40px; background: #fff; padding: 20px; border-radius: 10px;">
-    <h2>📘 Modelo Matemático del Sistema</h2>
-    <p><strong>1. Volumen del tanque:</strong></p>
-    <p style="margin-left: 20px;">V = A × h</p>
-    <p><strong>2. Caudal neto:</strong></p>
-    <p style="margin-left: 20px;">dV/dt = Q<sub>in</sub> − Q<sub>out</sub></p>
-    <p><strong>3. Tiempo estimado de llenado:</strong></p>
-    <p style="margin-left: 20px;">t = V / (Q<sub>in</sub> − Q<sub>out</sub>)</p>
-    <p><strong>4. Nivel con el tiempo:</strong></p>
-    <p style="margin-left: 20px;">h(t) = [(Q<sub>in</sub> − Q<sub>out</sub>) / A] × t</p>
-  </section>
 
   <script>
     let multiplicador = 1;
@@ -130,12 +124,75 @@
     let duracionReal = 0;
     let tiempoAnterior = null;
     let animacionActiva = false;
-
-    // NUEVO: Array para guardar los puntos simulados
     const puntosDispersos = [];
 
     function cambiarVelocidad(nuevaVelocidad) {
       multiplicador = nuevaVelocidad;
+    }
+
+    function calcularTiempoVaciado(alturaInicial, area, areaOrificio_cm2) {
+      const g = 9.81;
+      const Cd = 0.6;
+      const dt = 0.1;
+      const Ao = areaOrificio_cm2 / 10000;
+      let t = 0;
+      let h = alturaInicial;
+      while (h > 0) {
+        const Qout = Cd * Ao * Math.sqrt(2 * g * h);
+        const dV = Qout * dt;
+        const dh = dV / area;
+        h -= dh;
+        t += dt;
+        if (t > 3600) break;
+      }
+      return t;
+    }
+
+    function simularVaciado() {
+      const altura = parseFloat(document.getElementById('altura').value);
+      const area = parseFloat(document.getElementById('area').value);
+      const areaOrificio = parseFloat(document.getElementById('areaOrificio').value);
+      const water = document.getElementById('water');
+      const contador = document.getElementById('contador');
+      const resultado = document.getElementById("resultado");
+
+      if (altura <= 0 || area <= 0 || areaOrificio <= 0) {
+        alert("Por favor ingresa valores válidos y positivos.");
+        return;
+      }
+
+      const tiempoEnSegundos = calcularTiempoVaciado(altura, area, areaOrificio);
+      duracionReal = tiempoEnSegundos * 1000;
+
+      resultado.innerHTML =
+        `<strong>🧪 Tiempo estimado de vaciado:</strong> ${tiempoEnSegundos.toFixed(0)} s<br>` +
+        `<strong>📘 Ecuación aplicada:</strong> Q<sub>out</sub>(h) = C × A × √(2gh)`;
+
+      water.style.height = '100%';
+      contador.textContent = 'Tiempo simulado: 0 s';
+      cancelAnimationFrame(window.idAnimacion);
+      tiempoSimulado = 0;
+      tiempoAnterior = null;
+      animacionActiva = true;
+      window.idAnimacion = requestAnimationFrame(animarVaciado);
+    }
+
+    function animarVaciado(timestamp) {
+      const water = document.getElementById('water');
+      const contador = document.getElementById('contador');
+      if (!tiempoAnterior) tiempoAnterior = timestamp;
+      const deltaTiempo = (timestamp - tiempoAnterior) * multiplicador;
+      tiempoSimulado += deltaTiempo;
+      tiempoAnterior = timestamp;
+      const porcentaje = Math.max(100 - (tiempoSimulado / duracionReal) * 100, 0);
+      water.style.height = porcentaje + '%';
+      contador.textContent = `Tiempo simulado: ${Math.floor(tiempoSimulado / 1000)} s`;
+      if (porcentaje > 0 && animacionActiva) {
+        requestAnimationFrame(animarVaciado);
+      } else {
+        animacionActiva = false;
+        contador.textContent = `✅ ¡Vaciado completo en ${Math.round(tiempoSimulado / 1000)} s!`;
+      }
     }
 
     function simular() {
@@ -145,6 +202,7 @@
       const qout = parseFloat(document.getElementById('qout').value);
       const water = document.getElementById('water');
       const contador = document.getElementById('contador');
+      const resultado = document.getElementById("resultado");
 
       if (altura <= 0 || area <= 0 || qin < 0 || qout < 0) {
         alert("Por favor ingresa valores válidos y positivos.");
@@ -155,7 +213,7 @@
       const tasa = qin - qout;
 
       if (tasa <= 0) {
-        document.getElementById('resultado').textContent = "El tanque nunca se llenará con estos valores.";
+        resultado.innerHTML = "El tanque nunca se llenará con estos valores.";
         return;
       }
 
@@ -163,12 +221,10 @@
       const tiempoEnSegundos = tiempo * 60;
       duracionReal = tiempoEnSegundos * 1000;
 
-      document.getElementById('resultado').textContent =
-        tiempoEnSegundos >= 60
-          ? `Tiempo estimado de llenado: ${(tiempoEnSegundos / 60).toFixed(2)} minutos.`
-          : `Tiempo estimado de llenado: ${tiempoEnSegundos.toFixed(0)} segundos.`;
+      resultado.innerHTML =
+        `<strong>🧪 Tiempo estimado de llenado:</strong> ${tiempoEnSegundos.toFixed(0)} s<br>` +
+        `<strong>📘 Ecuación aplicada:</strong> t = V / (Q<sub>in</sub> − Q<sub>out</sub>)`;
 
-      // NUEVO: Guardar datos para gráfica de dispersión
       puntosDispersos.push({
         x: qin,
         y: parseFloat(tiempo.toFixed(2)),
@@ -221,29 +277,24 @@
     function animar(timestamp) {
       const water = document.getElementById('water');
       const contador = document.getElementById('contador');
-
       if (!tiempoAnterior) tiempoAnterior = timestamp;
-
       const deltaTiempo = (timestamp - tiempoAnterior) * multiplicador;
       tiempoSimulado += deltaTiempo;
       tiempoAnterior = timestamp;
-
       const porcentaje = Math.min((tiempoSimulado / duracionReal) * 100, 100);
       water.style.height = porcentaje + '%';
       contador.textContent = `Tiempo simulado: ${Math.floor(tiempoSimulado / 1000)} s`;
-
       if (porcentaje < 100 && animacionActiva) {
         requestAnimationFrame(animar);
       } else {
         animacionActiva = false;
-        contador.textContent = `✅ ¡Llenado completo en ${Math.round(tiempoSimulado / 1000)} s!`;
+        contador.textContent = `✅ ¡Llenado completo en ${Math.floor(duracionReal / 1000)} s!`;
       }
     }
 
     function cambiarGrafico() {
       const canvasTiempo = document.getElementById("graficoTiempo");
       const canvasDisperso = document.getElementById("graficoDisperso");
-
       if (canvasTiempo.style.display === "none") {
         canvasTiempo.style.display = "block";
         canvasDisperso.style.display = "none";
@@ -289,34 +340,34 @@
         }
       });
     }
-    
+
     function optimizarQin() {
-    const altura = parseFloat(document.getElementById('altura').value);
-    const area = parseFloat(document.getElementById('area').value);
-    const qout = parseFloat(document.getElementById('qout').value);
-
-    if (altura <= 0 || area <= 0 || qout < 0) {
-      alert("Por favor ingresa valores válidos.");
-      return;
-    }
-
-    const volumen = area * altura * 1000; // en litros
-    let qin = qout + 0.01; // el mínimo válido (para evitar división por cero)
-    let mejorQin = qin;
-    let mejorTiempo = volumen / (qin - qout);
-
-    for (let i = 1; i <= 100; i++) {
-      qin = qout + i;
-      const tiempo = volumen / (qin - qout);
-      if (tiempo < mejorTiempo) {
-        mejorTiempo = tiempo;
-        mejorQin = qin;
+      const altura = parseFloat(document.getElementById('altura').value);
+      const area = parseFloat(document.getElementById('area').value);
+      const qout = parseFloat(document.getElementById('qout').value);
+      if (altura <= 0 || area <= 0 || qout < 0) {
+        alert("Por favor ingresa valores válidos.");
+        return;
       }
+      const volumen = area * altura * 1000;
+      let qin = qout + 0.01;
+      let mejorQin = qin;
+      let mejorTiempo = volumen / (qin - qout);
+      for (let i = 1; i <= 100; i++) {
+        qin = qout + i;
+        const tiempo = volumen / (qin - qout);
+        if (tiempo < mejorTiempo) {
+          mejorTiempo = tiempo;
+          mejorQin = qin;
+        }
+      }
+      document.getElementById('qin').value = mejorQin.toFixed(2);
+      const resultado = document.getElementById("resultado");
+      resultado.innerHTML =
+        `<strong>🔍 Qin óptimo:</strong> ${mejorQin.toFixed(2)} L/min<br>` +
+        `<strong>⏱ Tiempo estimado:</strong> ${mejorTiempo.toFixed(2)} min`;
+      simular();
     }
-
-    const resultado = document.getElementById("resultado");
-    resultado.innerHTML += `<br><strong>🔍 Qin óptimo (mínimo tiempo de llenado):</strong> ${mejorQin} L/min<br><strong>⏱ Tiempo estimado:</strong> ${(mejorTiempo).toFixed(2)} min`;
-  }
   </script>
 </body>
 </html>
