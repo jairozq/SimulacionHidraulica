@@ -88,6 +88,7 @@
       </div>
       <button class="btn" onclick="simular()">Simular</button>
       <button class="btn" onclick="cambiarGrafico()">Cambiar gráfico</button>
+      <button class="btn" onclick="optimizarQin()">Optimizar Qin</button>
       <div style="margin-top: 20px;">
         <label><strong>Velocidad:</strong></label><br>
         <button class="btn" onclick="cambiarVelocidad(0.5)">×0.5</button>
@@ -288,6 +289,34 @@
         }
       });
     }
+    
+    function optimizarQin() {
+    const altura = parseFloat(document.getElementById('altura').value);
+    const area = parseFloat(document.getElementById('area').value);
+    const qout = parseFloat(document.getElementById('qout').value);
+
+    if (altura <= 0 || area <= 0 || qout < 0) {
+      alert("Por favor ingresa valores válidos.");
+      return;
+    }
+
+    const volumen = area * altura * 1000; // en litros
+    let qin = qout + 0.01; // el mínimo válido (para evitar división por cero)
+    let mejorQin = qin;
+    let mejorTiempo = volumen / (qin - qout);
+
+    for (let i = 1; i <= 100; i++) {
+      qin = qout + i;
+      const tiempo = volumen / (qin - qout);
+      if (tiempo < mejorTiempo) {
+        mejorTiempo = tiempo;
+        mejorQin = qin;
+      }
+    }
+
+    const resultado = document.getElementById("resultado");
+    resultado.innerHTML += `<br><strong>🔍 Qin óptimo (mínimo tiempo de llenado):</strong> ${mejorQin} L/min<br><strong>⏱ Tiempo estimado:</strong> ${(mejorTiempo).toFixed(2)} min`;
+  }
   </script>
 </body>
 </html>
