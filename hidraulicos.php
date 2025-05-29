@@ -1,4 +1,3 @@
-<!-- Coloca esto en tu archivo HTML -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -117,7 +116,19 @@
 
   <canvas id="graficoTiempo" style="display: block; margin-top: 30px;"></canvas>
   <canvas id="graficoDisperso" style="display: none; margin-top: 30px;"></canvas>
-
+  
+  <section style="margin-top: 40px; background: #fff; padding: 20px; border-radius: 10px;">
+    <h2>📘 Modelo Matemático del Sistema</h2>
+    <p><strong>1. Volumen del tanque:</strong></p>
+    <p style="margin-left: 20px;">V = A × h</p>
+    <p><strong>2. Caudal neto:</strong></p>
+    <p style="margin-left: 20px;">dV/dt = Q<sub>in</sub> − Q<sub>out</sub></p>
+    <p><strong>3. Tiempo estimado de llenado:</strong></p>
+    <p style="margin-left: 20px;">t = V / (Q<sub>in</sub> − Q<sub>out</sub>)</p>
+    <p><strong>4. Nivel con el tiempo:</strong></p>
+    <p style="margin-left: 20px;">h(t) = [(Q<sub>in</sub> − Q<sub>out</sub>) / A] × t</p>
+  </section>
+  
   <script>
     let multiplicador = 1;
     let tiempoSimulado = 0;
@@ -203,28 +214,39 @@
       const water = document.getElementById('water');
       const contador = document.getElementById('contador');
       const resultado = document.getElementById("resultado");
-
+    
       if (altura <= 0 || area <= 0 || qin < 0 || qout < 0) {
         alert("Por favor ingresa valores válidos y positivos.");
         return;
       }
-
-      const volumen = area * altura * 1000;
-      const tasa = qin - qout;
-
-      if (tasa <= 0) {
-        resultado.innerHTML = "El tanque nunca se llenará con estos valores.";
+    
+      const volumenTotal = area * altura * 1000; // litros
+      const tasa = qin - qout; // L/min
+    
+      let tiempo;
+      let mensajeFinal;
+      
+      if (tasa > 0) {
+        // Llenado
+        tiempo = volumenTotal / tasa; // en minutos
+        mensajeFinal = `✅ ¡Llenado completo en ${Math.floor(tiempo * 60)} s!`;
+      } else if (tasa < 0) {
+        // Vaciado (comenzando lleno)
+        tiempo = volumenTotal / Math.abs(tasa);
+        mensajeFinal = `💧 ¡Vaciado completo en ${Math.floor(tiempo * 60)} s!`;
+      } else {
+        resultado.innerHTML = "🚫 El tanque no se llenará ni vaciará: Qin = Qout";
         return;
       }
-
-      const tiempo = volumen / tasa;
+    
       const tiempoEnSegundos = tiempo * 60;
       duracionReal = tiempoEnSegundos * 1000;
-
+    
       resultado.innerHTML =
-        `<strong>🧪 Tiempo estimado de llenado:</strong> ${tiempoEnSegundos.toFixed(0)} s<br>` +
-        `<strong>📘 Ecuación aplicada:</strong> t = V / (Q<sub>in</sub> − Q<sub>out</sub>)`;
-
+        `<strong>⏱ Tiempo estimado:</strong> ${tiempo.toFixed(2)} min<br>` +
+        `<strong>📘 Ecuación aplicada:</strong> t = V / |Q<sub>in</sub> − Q<sub>out</sub>|<br>` +
+        `t = ${volumenTotal.toFixed(2)} / |${qin} − ${qout}|`;
+    
       puntosDispersos.push({
         x: qin,
         y: parseFloat(tiempo.toFixed(2)),
@@ -233,24 +255,32 @@
         area,
         altura
       });
-
-      water.style.height = '0%';
+    
+      water.style.height = (tasa > 0) ? '0%' : '100%';
       contador.textContent = 'Tiempo simulado: 0 s';
       cancelAnimationFrame(window.idAnimacion);
       tiempoSimulado = 0;
       tiempoAnterior = null;
       animacionActiva = true;
+    
+      // Guardamos si es llenado o vaciado
+      window.animacionTipo = (tasa > 0) ? 'llenado' : 'vaciado';
+      window.animacionMensajeFinal = mensajeFinal;
+    
       window.idAnimacion = requestAnimationFrame(animar);
-
+    
+      // Generar gráfico de nivel
       const tiempoDatos = [];
       const nivelDatos = [];
-
+    
       for (let t = 0; t <= tiempo + 1; t++) {
         tiempoDatos.push(t);
-        const nivelActual = (t * tasa) / volumen * 100;
-        nivelDatos.push(Math.min(nivelActual, 100));
+        const nivelActual = (tasa > 0)
+          ? (t * tasa) / volumenTotal * 100
+          : 100 - ((t * Math.abs(tasa)) / volumenTotal * 100);
+        nivelDatos.push(Math.max(0, Math.min(nivelActual, 100)));
       }
-
+    
       const ctx = document.getElementById('graficoTiempo').getContext('2d');
       if (window.chartTiempo) window.chartTiempo.destroy();
       window.chartTiempo = new Chart(ctx, {
@@ -273,6 +303,7 @@
         }
       });
     }
+
 
     function animar(timestamp) {
       const water = document.getElementById('water');
